@@ -7,6 +7,7 @@ import pickle
 import logging
 import threading
 import redis
+import glob
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 from http.server import HTTPServer
@@ -58,6 +59,7 @@ class YouTubeLiveMonitor:
         }
         self.last_heartbeat = datetime.now(timezone.utc)
         self.last_broadcast_check = datetime.now(timezone.utc)
+        self.last_log_cleanup = datetime.now(timezone.utc)
 
         # Load saved state
         self._load_state()
@@ -92,6 +94,40 @@ class YouTubeLiveMonitor:
             logger.info(f"Loaded state: {len(self.active_streams)} active streams")
         except Exception as e:
             logger.error(f"Error loading state: {e}")
+
+    def _cleanup_old_logs(self) -> None:
+        """Clean up log files older than retention period"""
+        log_file = os.environ.get('TUBULAR_LOG_FILE')
+        if not log_file:
+            return
+        
+        log_dir = os.path.dirname(log_file)
+        if not os.path.exists(log_dir):
+            return
+        
+        max_age_days = int(os.environ.get('TUBULAR_LOG_RETENTION_DAYS', '7'))
+        now = time.time()
+        max_age_seconds = max_age_days * 86400
+        
+        log_patterns = [
+            os.path.join(log_dir, '*.log'),
+            os.path.join(log_dir, '*.log.*')
+        ]
+        
+        deleted_count = 0
+        for pattern in log_patterns:
+            for log_file_path in glob.glob(pattern):
+                try:
+                    file_age = now - os.path.getmtime(log_file_path)
+                    if file_age > max_age_seconds:
+                        os.remove(log_file_path)
+                        logger.info(f"Deleted old log file: {log_file_path} (age: {file_age / 86400:.1f} days)")
+                        deleted_count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to delete log file {log_file_path}: {e}")
+        
+        if deleted_count > 0:
+            logger.info(f"Cleaned up {deleted_count} old log file(s)")
 
     def _update_heartbeat(self) -> None:
         """Update heartbeat in Redis"""
@@ -195,6 +231,11 @@ class YouTubeLiveMonitor:
                 now = datetime.now(timezone.utc)
                 if (now - self.last_heartbeat).total_seconds() >= self.config.heartbeat_interval:
                     self._update_heartbeat()
+
+                # Clean up old logs once per day
+                if (now - self.last_log_cleanup).total_seconds() >= 86400:  # 24 hours
+                    self._cleanup_old_logs()
+                    self.last_log_cleanup = now
 
                 # Periodically retry failed webhooks
                 if retry_counter % 10 == 0:  # Every 10 poll cycles
