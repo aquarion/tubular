@@ -46,8 +46,8 @@ def validate_environment(show_details: bool = True) -> Tuple[bool, List[str]]:
     required_vars = {
         'YOUTUBE_API_KEY': 'YouTube Data API v3 key from https://console.cloud.google.com/apis/credentials',
         'YOUTUBE_CHANNEL_ID': 'YouTube channel ID to monitor (format: UCxxxxxxxxxxxxxx)',
-        'WEBHOOK_TARGET_URL': 'Target URL to forward webhooks to (e.g., https://example.com/webhooks/youtube)',
-        'YOUTUBE_CALLBACK_URL': 'Public callback URL for PubSubHubbub (must be internet-accessible)'
+        'TUBULAR_WEBHOOK_URL': 'Target URL to forward webhooks to (e.g., https://example.com/webhooks/youtube)',
+        'TUBULAR_CALLBACK_URL': 'Public callback URL for PubSubHubbub (must be internet-accessible)'
     }
 
     # Optional variables with descriptions and defaults
@@ -143,9 +143,9 @@ class YouTubeConfig:
 
         self.api_key = os.getenv('YOUTUBE_API_KEY')
         self.channel_id = os.getenv('YOUTUBE_CHANNEL_ID')
-        self.webhook_url = os.getenv('WEBHOOK_TARGET_URL', 'http://localhost/webhooks/youtube')
+        self.webhook_url = os.getenv('TUBULAR_WEBHOOK_URL', 'http://localhost/webhooks/youtube')
         self.webhook_secret = os.getenv('WEBHOOK_SECRET', '')
-        self.callback_url = os.getenv('YOUTUBE_CALLBACK_URL', 'http://localhost:8080/youtube/callback')
+        self.callback_url = os.getenv('TUBULAR_CALLBACK_URL', 'http://localhost:8080/youtube/callback')
         self.hub_url = 'https://pubsubhubbub.appspot.com/subscribe'
         self.topic_url_template = 'https://www.youtube.com/xml/feeds/videos.xml?channel_id={}'
 

@@ -55,9 +55,9 @@ def main() -> None:
 Environment Variables:
   YOUTUBE_API_KEY           YouTube Data API v3 key (required)
   YOUTUBE_CHANNEL_ID        YouTube channel ID to monitor (required)
-  WEBHOOK_TARGET_URL        URL to forward events to (default: http://localhost/webhooks/youtube)
+  TUBULAR_WEBHOOK_URL        URL to forward events to (default: http://localhost/webhooks/youtube)
   WEBHOOK_SECRET            Secret for HMAC signing (optional)
-  YOUTUBE_CALLBACK_URL      Public callback URL for PubSubHubbub (required for feed subscriptions)
+  TUBULAR_CALLBACK_URL      Public callback URL for PubSubHubbub (required for feed subscriptions)
   TUBULAR_CALLBACK_PORT     Port for callback server (default: 8080)
   YOUTUBE_POLL_INTERVAL     Polling interval in seconds (default: 60)
   CALLBACK_BIND_ADDRESS     Bind address for callback server (default: all interfaces)
@@ -65,8 +65,8 @@ Environment Variables:
 Example:
   export YOUTUBE_API_KEY="your-api-key"
   export YOUTUBE_CHANNEL_ID="UCxxxxxxxxxxxxxx"
-  export WEBHOOK_TARGET_URL="https://example.com/webhooks/youtube"
-  export YOUTUBE_CALLBACK_URL="https://your-server.com:8080/youtube/callback"
+  export TUBULAR_WEBHOOK_URL="https://example.com/webhooks/youtube"
+  export TUBULAR_CALLBACK_URL="https://your-server.com:8080/youtube/callback"
   python -m tubular
         """
     )

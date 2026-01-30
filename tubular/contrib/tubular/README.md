@@ -58,8 +58,8 @@ All configuration is done via environment variables. Copy `.env.example` to `.en
 |----------|-------------|---------|
 | `YOUTUBE_API_KEY` | YouTube Data API v3 key | `AIzaSyC...` |
 | `YOUTUBE_CHANNEL_ID` | Channel ID to monitor | `UCxxxxxxxxxxxxxx` |
-| `WEBHOOK_TARGET_URL` | Endpoint to receive webhooks | `https://example.com/webhooks/youtube` |
-| `YOUTUBE_CALLBACK_URL` | Public callback URL for PubSubHubbub | `https://your-server.com:8080/youtube/callback` |
+| `TUBULAR_WEBHOOK_URL` | Endpoint to receive webhooks | `https://example.com/webhooks/youtube` |
+| `TUBULAR_CALLBACK_URL` | Public callback URL for PubSubHubbub | `https://your-server.com:8080/youtube/callback` |
 
 ### Optional Variables
 
@@ -107,7 +107,7 @@ sail build tubular
 
 ## Webhook Events
 
-All webhooks are sent as HTTP POST requests to `WEBHOOK_TARGET_URL` with JSON payloads. If `WEBHOOK_SECRET` is configured, requests include an `X-Hub-Signature` header with HMAC-SHA256 signature.
+All webhooks are sent as HTTP POST requests to `TUBULAR_WEBHOOK_URL` with JSON payloads. If `WEBHOOK_SECRET` is configured, requests include an `X-Hub-Signature` header with HMAC-SHA256 signature.
 
 ### Live Stream Events
 
@@ -318,7 +318,7 @@ The script monitors quota usage and stops making API calls if quota is exceeded.
 
 ### PubSubHubbub Not Working
 
-Ensure `YOUTUBE_CALLBACK_URL` is:
+Ensure `TUBULAR_CALLBACK_URL` is:
 - Publicly accessible from the internet
 - Using HTTPS (or HTTP for local testing)
 - Not blocked by firewall
