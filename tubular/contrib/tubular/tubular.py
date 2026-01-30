@@ -31,12 +31,23 @@ import threading
 import argparse
 from collections import deque
 
+# Determine log directory - use app root storage/logs if available, otherwise current directory
+script_dir = os.path.dirname(os.path.abspath(__file__))
+app_root = os.path.abspath(os.path.join(script_dir, '../../'))
+log_dir = os.path.join(app_root, 'storage/logs')
+
+# Create log directory if it doesn't exist
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir, exist_ok=True)
+
+log_file = os.path.join(log_dir, 'tubular.log')
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('tubular.log'),
+        logging.FileHandler(log_file),
         logging.StreamHandler(sys.stdout)
     ]
 )
