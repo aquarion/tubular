@@ -6,8 +6,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application
-COPY tubular.py .
+# Copy application package
+COPY tubular/ /app/tubular/
 
 # Create directory for logs and state
 RUN mkdir -p /app/data
@@ -17,4 +17,4 @@ RUN useradd -m -u 1000 tubular && \
     chown -R tubular:tubular /app
 USER tubular
 
-CMD ["python", "-u", "tubular.py"]
+CMD ["python", "-u", "-m", "tubular"]

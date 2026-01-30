@@ -1,6 +1,21 @@
 # Tubular - YouTube Live Events Webhook Forwarder
 
-Tubular is a Python script that monitors YouTube live streams and forwards events as webhooks to another server (such as the Stream Delta Laravel application). It subscribes to YouTube channel feeds via PubSubHubbub and polls the YouTube Data API v3 for real-time stream status and chat activity.
+Tubular is a Python package that monitors YouTube live streams and forwards events as webhooks to another server (such as the Stream Delta Laravel application). It subscribes to YouTube channel feeds via PubSubHubbub and polls the YouTube Data API v3 for real-time stream status and chat activity.
+
+## Package Structure
+
+Now organized as a modular Python package:
+
+```
+tubular/
+├── __init__.py          # Package initialization
+├── __main__.py          # Entry point (python -m tubular)
+├── config.py            # Configuration and environment validation
+├── api_client.py        # YouTube API client with quota tracking
+├── webhook.py           # Webhook forwarding and PubSubHubbub
+├── server.py            # HTTP server for callbacks
+└── monitor.py           # Main monitor class
+```
 
 ## Features
 
