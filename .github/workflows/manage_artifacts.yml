@@ -19,10 +19,10 @@ jobs:
             repo: context.repo.repo,
             per_page: 100
           });
-    
+
           const cutoffDate = new Date();
           cutoffDate.setDate(cutoffDate.getDate() - 7);
-    
+
           for (const artifact of artifacts.data.artifacts) {
             const createdAt = new Date(artifact.created_at);
             if (createdAt < cutoffDate) {

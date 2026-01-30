@@ -6,65 +6,60 @@ This script subscribes to YouTube live events using the YouTube Data API v3
 and forwards them as webhooks to another server (like the stream-delta Laravel app).
 """
 
+import argparse
+import glob
+import logging
 import os
 import sys
-import logging
-import argparse
 import time
-import glob
 from logging.handlers import RotatingFileHandler
 
 # Configure logging with rotation
 handlers = [logging.StreamHandler(sys.stdout)]
 
-if os.environ.get('TUBULAR_LOG_FILE'):
-    log_file = os.environ['TUBULAR_LOG_FILE']
+if os.environ.get("TUBULAR_LOG_FILE"):
+    log_file = os.environ["TUBULAR_LOG_FILE"]
     # 10MB max file size, keep 5 backup files
-    max_bytes = int(os.environ.get('TUBULAR_LOG_MAX_BYTES', 10 * 1024 * 1024))
-    backup_count = int(os.environ.get('TUBULAR_LOG_BACKUP_COUNT', 5))
-    
+    max_bytes = int(os.environ.get("TUBULAR_LOG_MAX_BYTES", 10 * 1024 * 1024))
+    backup_count = int(os.environ.get("TUBULAR_LOG_BACKUP_COUNT", 5))
+
     file_handler = RotatingFileHandler(
-        log_file,
-        maxBytes=max_bytes,
-        backupCount=backup_count
+        log_file, maxBytes=max_bytes, backupCount=backup_count
     )
     handlers.append(file_handler)
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=handlers
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=handlers,
 )
-logger = logging.getLogger('tubular')
+logger = logging.getLogger("tubular")
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tubular.config import load_env_file, validate_environment, YouTubeConfig
-from tubular.webhook import PubSubHubbubSubscriber
+from tubular.config import YouTubeConfig, load_env_file, validate_environment
 from tubular.monitor import YouTubeLiveMonitor
+from tubular.webhook import PubSubHubbubSubscriber
 
 
 def cleanup_old_logs(log_dir: str, max_age_days: int = 7) -> None:
     """
     Delete log files older than the specified number of days
-    
+
     Args:
         log_dir: Directory containing log files
         max_age_days: Maximum age of log files in days (default: 7)
     """
     if not os.path.exists(log_dir):
         return
-    
+
     now = time.time()
     max_age_seconds = max_age_days * 86400  # days to seconds
-    
+
     # Find all log files (*.log and *.log.*)
-    log_patterns = [
-        os.path.join(log_dir, '*.log'),
-        os.path.join(log_dir, '*.log.*')
-    ]
-    
+    log_patterns = [os.path.join(log_dir, "*.log"), os.path.join(log_dir, "*.log.*")]
+
     deleted_count = 0
     for pattern in log_patterns:
         for log_file in glob.glob(pattern):
@@ -72,11 +67,13 @@ def cleanup_old_logs(log_dir: str, max_age_days: int = 7) -> None:
                 file_age = now - os.path.getmtime(log_file)
                 if file_age > max_age_seconds:
                     os.remove(log_file)
-                    logger.info(f"Deleted old log file: {log_file} (age: {file_age / 86400:.1f} days)")
+                    logger.info(
+                        f"Deleted old log file: {log_file} (age: {file_age / 86400:.1f} days)"
+                    )
                     deleted_count += 1
             except Exception as e:
                 logger.warning(f"Failed to delete log file {log_file}: {e}")
-    
+
     if deleted_count > 0:
         logger.info(f"Cleaned up {deleted_count} old log file(s)")
 
@@ -84,7 +81,7 @@ def cleanup_old_logs(log_dir: str, max_age_days: int = 7) -> None:
 def main() -> None:
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description='YouTube Live Events Webhook Forwarder',
+        description="YouTube Live Events Webhook Forwarder",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Environment Variables:
@@ -112,27 +109,36 @@ Example:
   export TUBULAR_WEBHOOK_URL="https://example.com/webhooks/youtube"
   export TUBULAR_CALLBACK_URL="https://your-server.com:8080/youtube/callback"
   python -m tubular
-        """
+        """,
     )
 
-    parser.add_argument('--validate', action='store_true',
-                       help='Validate environment variables and exit')
-    parser.add_argument('--subscribe-only', action='store_true',
-                       help='Only subscribe to PubSubHubbub and exit')
-    parser.add_argument('--unsubscribe', action='store_true',
-                       help='Unsubscribe from PubSubHubbub and exit')
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Validate environment variables and exit",
+    )
+    parser.add_argument(
+        "--subscribe-only",
+        action="store_true",
+        help="Only subscribe to PubSubHubbub and exit",
+    )
+    parser.add_argument(
+        "--unsubscribe",
+        action="store_true",
+        help="Unsubscribe from PubSubHubbub and exit",
+    )
 
     args = parser.parse_args()
 
     # Try to load .env file
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    env_file = os.path.join(script_dir, '../.env')
+    env_file = os.path.join(script_dir, "../.env")
     load_env_file(env_file)
 
     # Clean up old log files
-    log_retention_days = int(os.environ.get('TUBULAR_LOG_RETENTION_DAYS', '7'))
-    if os.environ.get('TUBULAR_LOG_FILE'):
-        log_dir = os.path.dirname(os.environ['TUBULAR_LOG_FILE'])
+    log_retention_days = int(os.environ.get("TUBULAR_LOG_RETENTION_DAYS", "7"))
+    if os.environ.get("TUBULAR_LOG_FILE"):
+        log_dir = os.path.dirname(os.environ["TUBULAR_LOG_FILE"])
         cleanup_old_logs(log_dir, log_retention_days)
 
     # Handle --validate flag
@@ -144,7 +150,9 @@ Example:
         # Validate environment (will show brief error if validation fails)
         is_valid, missing = validate_environment(show_details=False)
         if not is_valid:
-            logger.error(f"Environment validation failed. Missing: {', '.join(missing)}")
+            logger.error(
+                f"Environment validation failed. Missing: {', '.join(missing)}"
+            )
             logger.error("Run with --validate flag for detailed information")
             sys.exit(1)
 
@@ -180,5 +188,5 @@ Example:
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
