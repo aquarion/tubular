@@ -31,16 +31,21 @@ import threading
 import argparse
 from collections import deque
 
-# Determine log directory - use app root storage/logs if available, otherwise current directory
-script_dir = os.path.dirname(os.path.abspath(__file__))
-app_root = os.path.abspath(os.path.join(script_dir, '../../'))
-log_dir = os.path.join(app_root, 'storage/logs')
+# Determine log directory - prefer Docker mount, fall back to app root storage/logs
+if os.path.exists('/var/log/tubular'):
+    # Running in Docker with mounted volume
+    log_file = '/var/log/tubular/tubular.log'
+else:
+    # Running standalone - use app root storage/logs
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    app_root = os.path.abspath(os.path.join(script_dir, '../../'))
+    log_dir = os.path.join(app_root, 'storage/logs')
 
-# Create log directory if it doesn't exist
-if not os.path.exists(log_dir):
-    os.makedirs(log_dir, exist_ok=True)
+    # Create log directory if it doesn't exist
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)
 
-log_file = os.path.join(log_dir, 'tubular.log')
+    log_file = os.path.join(log_dir, 'tubular.log')
 
 # Configure logging
 logging.basicConfig(
@@ -540,12 +545,74 @@ class PubSubHubbubSubscriber:
             logger.error(f"Error unsubscribing from feed: {e}")
             return False
 
+class ExampleEventsTrigger:
+    """Example class to trigger specific YouTube events manually"""
+
+    def __init__(self, forwarder: WebhookForwarder):
+        self.forwarder = forwarder
+
+    def trigger_event(self, event_type: str, event_data: Dict[str, Any]) -> None:
+        """Trigger a specific event manually"""
+        logger.info(f"Manually triggering event: {event_type}")
+        self.forwarder.forward_event(event_type, event_data)
+
+    def list_events(self) -> List[str]:
+        """List available example events"""
+        return [
+            'youtube.live.start',
+            'youtube.live.end',
+            'youtube.chat.message',
+            'youtube.superchat.received',
+            'youtube.member.joined'
+        ]
+
+    def get_event_data_template(self, event_type: str) -> Dict[str, Any]:
+        """Get a template for the specified event type"""
+        templates = {
+            'youtube.live.start': {
+                'video_id': 'EXAMPLE_VIDEO_ID',
+                'title': 'Example Live Stream',
+                'published_at': datetime.now(timezone.utc).isoformat(),
+                'channel_id': 'EXAMPLE_CHANNEL_ID',
+                'channel_title': 'Example Channel'
+            },
+            'youtube.live.end': {
+                'video_id': 'EXAMPLE_VIDEO_ID',
+                'title': 'Example Live Stream',
+                'ended_at': datetime.now(timezone.utc).isoformat(),
+                'channel_id': 'EXAMPLE_CHANNEL_ID',
+                'channel_title': 'Example Channel'
+            },
+            'youtube.chat.message': {
+                'video_id': 'EXAMPLE_VIDEO_ID',
+                'message_id': 'EXAMPLE_MESSAGE_ID',
+                'author_name': 'Example User',
+                'message_text': 'This is an example chat message.',
+                'published_at': datetime.now(timezone.utc).isoformat()
+            },
+            'youtube.superchat.received': {
+                'video_id': 'EXAMPLE_VIDEO_ID',
+                'superchat_id': 'EXAMPLE_SUPERCHAT_ID',
+                'author_name': 'Example User',
+                'amount_display_string': '$5.00',
+                'message_text': 'This is an example super chat message.',
+                'published_at': datetime.now(timezone.utc).isoformat()
+            },
+            'youtube.member.joined': {
+                'channel_id': 'EXAMPLE_CHANNEL_ID',
+                'member_name': 'Example Member',
+                'joined_at': datetime.now(timezone.utc).isoformat()
+            }
+        }
+        return templates.get(event_type, {})
+
 
 class CallbackHandler(BaseHTTPRequestHandler):
     """HTTP handler for PubSubHubbub callbacks"""
 
     forwarder: Optional[WebhookForwarder] = None
     api_client: Optional[YouTubeAPIClient] = None
+    example_events_trigger: Optional[ExampleEventsTrigger] = None
 
     def do_GET(self) -> None:
         """Handle verification requests from PubSubHubbub hub"""
@@ -570,6 +637,19 @@ class CallbackHandler(BaseHTTPRequestHandler):
         """Handle feed notifications from PubSubHubbub"""
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length)
+
+        if self.path.startswith('/example/'):
+            content_length = int(self.headers.get('Content-Length', 0))
+            event_name = self.path.split('/example/')[1]
+            if self.example_events_trigger:
+                event_data = self.example_events_trigger.get_event_data_template(event_name)
+                self.example_events_trigger.trigger_event(event_name, event_data)
+            else:
+                logger.error("ExampleEventsTrigger not configured")
+
+            self.wfile.write(f"Example event {event_name} triggered".encode('utf-8'))
+            self.send_response(200)
+            self.end_headers()
 
         try:
             # Parse Atom feed
