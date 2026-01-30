@@ -1,4 +1,4 @@
-.env
+# General Python files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -54,3 +54,7 @@ cython_debug/
 *.swo
 *~
 .DS_Store
+# Environment files
+.env
+.venv
+logs/
