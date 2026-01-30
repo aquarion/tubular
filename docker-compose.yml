@@ -1,58 +1,55 @@
-services:
-
-    redis:
-        image: 'redis:alpine'
-        ports:
-            - '${FORWARD_REDIS_PORT:-6379}:6379'
-        volumes:
-            - 'tubular-redis:/data'
-        networks:
-            - sail
-        healthcheck:
-            test:
-                - CMD
-                - redis-cli
-                - ping
-            retries: 3
-            timeout: 5s
-    tubular:
-        build:
-            context: '.'
-            dockerfile: Dockerfile
-        restart: unless-stopped
-        ports:
-            - '${TUBULAR_CALLBACK_PORT:-9181}:${TUBULAR_CALLBACK_PORT:-9181}'
-        environment:
-            YOUTUBE_API_KEY: '${YOUTUBE_API_KEY:-}'
-            YOUTUBE_CHANNEL_ID: '${YOUTUBE_CHANNEL_ID:-}'
-            TUBULAR_WEBHOOK_URL: '${TUBULAR_WEBHOOK_URL:-http://streamdelta/webhooks/youtube}'
-            WEBHOOK_SECRET: '${TUBULAR_WEBHOOK_SECRET:-}'
-            TUBULAR_CALLBACK_URL: '${TUBULAR_CALLBACK_URL:-}'
-            TUBULAR_CALLBACK_PORT: '${TUBULAR_CALLBACK_PORT:-9181}'
-            YOUTUBE_POLL_INTERVAL: '${YOUTUBE_POLL_INTERVAL:-180}'
-            CALLBACK_BIND_ADDRESS: ''
-            REDIS_HOST: ${REDIS_HOST:-redis}
-            REDIS_PORT: ${REDIS_PORT:-6379}
-            REDIS_PASSWORD: ${REDIS_PASSWORD:-''}
-            REDIS_DB: ${REDIS_DB:-0}
-            TUBULAR_HEARTBEAT_INTERVAL: '${TUBULAR_HEARTBEAT_INTERVAL:-30}'
-            TUBULAR_LOG_FILE: '/var/log/tubular/tubular.log'
-            TUBULAR_LOG_LEVEL: '${TUBULAR_LOG_LEVEL:-INFO}'
-        volumes:
-            - 'tubular-logs:/var/log/tubular:rw'
-        networks:
-            - sail
-        depends_on:
-            - redis
+name: tubular
 networks:
-    sail:
-        driver: bridge
+  sail:
+    driver: bridge
+    name: tubular_sail
+services:
+  redis:
+    healthcheck:
+      retries: 3
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      timeout: 5s
+    image: redis:alpine
+    networks:
+      sail: null
+    ports:
+      - ${FORWARD_REDIS_PORT:-6379}:6379
+    volumes:
+      - source: tubular-redis
+        target: /data
+        type: volume
+        volume: {}
+  tubular:
+    build:
+      dockerfile: Dockerfile
+    depends_on:
+      redis:
+        condition: service_started
+        required: true
+    environment:
+      CALLBACK_BIND_ADDRESS: ""
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-''}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      TUBULAR_CALLBACK_PORT: ${TUBULAR_CALLBACK_PORT:-9181}
+      TUBULAR_CALLBACK_URL: ${TUBULAR_CALLBACK_URL:-}
+      TUBULAR_HEARTBEAT_INTERVAL: ${TUBULAR_HEARTBEAT_INTERVAL:-30}
+      TUBULAR_LOG_LEVEL: ${TUBULAR_LOG_LEVEL:-INFO}
+      TUBULAR_WEBHOOK_URL: ${TUBULAR_WEBHOOK_URL:-http://streamdelta/webhooks/youtube}
+      WEBHOOK_SECRET: ${TUBULAR_WEBHOOK_SECRET:-}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      YOUTUBE_CHANNEL_ID: ${YOUTUBE_CHANNEL_ID:-}
+      YOUTUBE_POLL_INTERVAL: ${YOUTUBE_POLL_INTERVAL:-180}
+    networks:
+      sail: null
+    ports:
+      - ${TUBULAR_CALLBACK_PORT:-9181}:${TUBULAR_CALLBACK_PORT:-9181}
+    restart: unless-stopped
 volumes:
-    tubular-redis:
-        driver: local
-    tubular-logs:
-        driver: local
-        driver_opts:
-            type: 'none'
-            device: './logs'
-            o: 'bind'
+  tubular-redis:
+    driver: local
+    name: tubular_tubular-redis
