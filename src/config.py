@@ -178,7 +178,13 @@ class YouTubeConfig:
         # Redis configuration for heartbeat
         self.redis_host = os.getenv("REDIS_HOST", "localhost")
         self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
-        self.redis_password = os.getenv("REDIS_PASSWORD", "") or None
+        redis_password = os.getenv("REDIS_PASSWORD", "")
+        # Handle "null" string or empty values as None
+        self.redis_password = (
+            None
+            if not redis_password or redis_password.lower() == "null"
+            else redis_password
+        )
         self.redis_db = int(os.getenv("REDIS_DB", "0"))
         self.heartbeat_interval = int(os.getenv("TUBULAR_HEARTBEAT_INTERVAL", "30"))
 
