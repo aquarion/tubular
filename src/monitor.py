@@ -238,7 +238,12 @@ class YouTubeLiveMonitor:
 
         while self.running:
             try:
-                self._check_live_streams()
+                if self.config.disable_idle_polling and not self.active_streams:
+                    logger.debug(
+                        "Idle polling disabled; skipping API checks while no streams are active"
+                    )
+                else:
+                    self._check_live_streams()
 
                 # Update heartbeat if interval has passed
                 now = datetime.now(timezone.utc)

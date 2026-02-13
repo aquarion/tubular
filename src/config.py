@@ -54,6 +54,7 @@ def validate_environment(show_details: bool = True) -> Tuple[bool, List[str]]:
     optional_vars = {
         "WEBHOOK_SECRET": "Secret key for signing webhooks (recommended for security)",
         "YOUTUBE_POLL_INTERVAL": "Seconds between poll checks (default: 60, minimum: 10)",
+        "YOUTUBE_DISABLE_IDLE_POLLING": "Disable API polling when no live streams are active (default: false)",
         "TUBULAR_CALLBACK_PORT": "Port for callback HTTP server (default: 8080)",
         "CALLBACK_BIND_ADDRESS": "Address to bind callback server to (default: empty = all interfaces)",
         "REDIS_HOST": "Redis host for heartbeat monitoring (default: localhost)",
@@ -163,6 +164,14 @@ class YouTubeConfig:
             )
             poll_interval = 10
         self.poll_interval = poll_interval
+
+        # Disable polling when no live streams are active
+        disable_idle_polling = os.getenv("YOUTUBE_DISABLE_IDLE_POLLING", "false")
+        self.disable_idle_polling = disable_idle_polling.strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
 
         # Validate and set server port
         server_port = int(os.getenv("TUBULAR_CALLBACK_PORT", "8080"))
