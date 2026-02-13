@@ -36,6 +36,7 @@ class WebhookForwarder:
         headers = {
             "Content-Type": "application/json",
             "User-Agent": "Tubular-YouTube-Webhook-Forwarder/1.0",
+            "Connection": "close",
         }
 
         # Add HMAC signature if secret is configured
@@ -46,12 +47,18 @@ class WebhookForwarder:
         try:
             logger.info(f"Forwarding {event_type} event to {self.config.webhook_url}")
             response = self.session.post(
-                self.config.webhook_url, json=payload, headers=headers, timeout=10
+                self.config.webhook_url,
+                json=payload,
+                headers=headers,
+                timeout=(3.0, 5.0),
             )
             response.raise_for_status()
             logger.info(f"Successfully forwarded {event_type} event")
             return True
         except requests.RequestException as e:
+            # Reset the session to avoid stale keep-alive connections
+            self.session.close()
+            self.session = requests.Session()
             logger.error(f"Error forwarding webhook (attempt {retry_count + 1}): {e}")
 
             # Retry with exponential backoff (max 3 retries)

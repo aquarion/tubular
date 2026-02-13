@@ -2,6 +2,7 @@
 
 import json
 import logging
+import threading
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler
 from typing import Any, Dict, List, Optional
@@ -146,7 +147,12 @@ class CallbackHandler(BaseHTTPRequestHandler):
                         b"Unknown example event " + event_name.encode("utf-8")
                     )
                     return
-                self.example_events_trigger.trigger_event(event_name, event_data)
+                # Fire-and-forget to avoid blocking the HTTP response on retries
+                threading.Thread(
+                    target=self.example_events_trigger.trigger_event,
+                    args=(event_name, event_data),
+                    daemon=True,
+                ).start()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/plain")
                 self.end_headers()
