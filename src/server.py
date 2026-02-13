@@ -99,9 +99,9 @@ class CallbackHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps(response).encode("utf-8"))
                 return
 
-            if "hub.challenge" in params:
-                challenge = params["hub.challenge"][0]
-                mode = params.get("hub.mode", [""])[0]
+            if "hub_challenge" in params:
+                challenge = params["hub_challenge"][0]
+                mode = params.get("hub_mode", [""])[0]
 
                 logger.info(
                     f"Received {mode} verification request - responding with challenge"
