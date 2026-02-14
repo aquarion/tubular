@@ -1,3 +1,12 @@
+# Publishes Docker images to GHCR.
+# Triggering:
+# - Push to main (branch tags).
+# - Push a git tag like v1.2.3 (tag + semver tags).
+# - PRs build only (no push).
+# Examples (image: ghcr.io/<owner>/<repo>):
+# - Tag push v1.2.3 -> v1.2.3, 1.2, 1 (and latest if main).
+# - Branch push main -> main, sha-<short> (and latest).
+# - Branch push feature/foo -> feature-foo, sha-<short>.
 name: Docker Publish
 
 on:
@@ -43,12 +52,13 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
+            type=ref,event=tag
+            type=ref,event=branch,enable={{is_branch}}
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=sha,prefix={{branch}}-
+            type=sha,prefix=sha-,enable={{is_branch}}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
