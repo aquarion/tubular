@@ -11,13 +11,12 @@ name: Docker Publish
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*"
   pull_request:
     branches:
       - main
+      - feature/*
   workflow_dispatch:
 
 env:
@@ -53,13 +52,13 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=tag
-            type=ref,event=branch,enable={{is_branch}}
+            type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=sha,prefix=sha-,enable={{is_branch}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
