@@ -29,14 +29,18 @@ class YouTubeLiveMonitor:
 
         # Initialize Redis client first (needed for both API client and heartbeat)
         try:
-            self.redis_client = redis.Redis(
-                host=config.redis_host,
-                port=config.redis_port,
-                password=config.redis_password,
-                db=config.redis_db,
-                decode_responses=True,
-                socket_connect_timeout=5,
-            )
+            redis_kwargs = {
+                "host": config.redis_host,
+                "port": config.redis_port,
+                "db": config.redis_db,
+                "decode_responses": True,
+                "socket_connect_timeout": 5,
+            }
+            if config.redis_username:
+                redis_kwargs["username"] = config.redis_username
+            if config.redis_password:
+                redis_kwargs["password"] = config.redis_password
+            self.redis_client = redis.Redis(**redis_kwargs)
             # Test connection
             self.redis_client.ping()
             logger.info(

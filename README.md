@@ -68,12 +68,18 @@ All configuration is done via environment variables. Copy `.env.example` to `.en
 | `WEBHOOK_SECRET` | _(empty)_ | Secret for HMAC webhook signing |
 | `TUBULAR_CALLBACK_PORT` | `8080` | Port for callback HTTP server |
 | `YOUTUBE_POLL_INTERVAL` | `60` | Polling interval in seconds |
+| `YOUTUBE_DISABLE_IDLE_POLLING` | `false` | Disable API polling when no live streams are active |
 | `CALLBACK_BIND_ADDRESS` | _(all interfaces)_ | Bind address for callback server |
 | `REDIS_HOST` | `localhost` | Redis host for heartbeat |
 | `REDIS_PORT` | `6379` | Redis port |
+| `REDIS_USERNAME` | _(empty)_ | Redis username for ACL (Redis 6+) |
 | `REDIS_PASSWORD` | _(empty)_ | Redis password |
 | `REDIS_DB` | `0` | Redis database number |
 | `TUBULAR_HEARTBEAT_INTERVAL` | `30` | Heartbeat update interval (seconds) |
+| `TUBULAR_LOG_FILE` | _(stdout)_ | Path to log file (enables file logging) |
+| `TUBULAR_LOG_MAX_BYTES` | `10485760` | Max log file size in bytes before rotation |
+| `TUBULAR_LOG_BACKUP_COUNT` | `5` | Number of backup log files to keep |
+| `TUBULAR_LOG_RETENTION_DAYS` | `7` | Days to keep old log files |
 
 ## Running
 

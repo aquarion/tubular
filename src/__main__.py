@@ -95,6 +95,7 @@ Environment Variables:
   CALLBACK_BIND_ADDRESS     Bind address for callback server (default: all interfaces)
   REDIS_HOST                Redis host for heartbeat monitoring (default: localhost)
   REDIS_PORT                Redis port (default: 6379)
+  REDIS_USERNAME            Redis username for ACL (optional, requires Redis 6+)
   REDIS_PASSWORD            Redis password if required (optional)
   REDIS_DB                  Redis database number (default: 0)
   TUBULAR_HEARTBEAT_INTERVAL Heartbeat update interval in seconds (default: 30)

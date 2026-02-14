@@ -59,6 +59,7 @@ def validate_environment(show_details: bool = True) -> Tuple[bool, List[str]]:
         "CALLBACK_BIND_ADDRESS": "Address to bind callback server to (default: empty = all interfaces)",
         "REDIS_HOST": "Redis host for heartbeat monitoring (default: localhost)",
         "REDIS_PORT": "Redis port (default: 6379)",
+        "REDIS_USERNAME": "Redis username for ACL (optional, requires Redis 6+)",
         "REDIS_PASSWORD": "Redis password if required (optional)",
         "REDIS_DB": "Redis database number (default: 0)",
         "TUBULAR_HEARTBEAT_INTERVAL": "Seconds between heartbeat updates (default: 30)",
@@ -187,6 +188,13 @@ class YouTubeConfig:
         # Redis configuration for heartbeat
         self.redis_host = os.getenv("REDIS_HOST", "localhost")
         self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        redis_username = os.getenv("REDIS_USERNAME", "")
+        # Handle "null" string or empty values as None
+        self.redis_username = (
+            None
+            if not redis_username or redis_username.lower() == "null"
+            else redis_username
+        )
         redis_password = os.getenv("REDIS_PASSWORD", "")
         # Handle "null" string or empty values as None
         self.redis_password = (
