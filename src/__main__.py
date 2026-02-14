@@ -38,9 +38,9 @@ logger = logging.getLogger("tubular")
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tubular.config import YouTubeConfig, load_env_file, validate_environment
-from tubular.monitor import YouTubeLiveMonitor
-from tubular.webhook import PubSubHubbubSubscriber
+from tubular.core.config import YouTubeConfig, load_env_file, validate_environment
+from tubular.monitoring.monitor import YouTubeLiveMonitor
+from tubular.webhooks.webhook import PubSubHubbubSubscriber
 
 
 def cleanup_old_logs(log_dir: str, max_age_days: int = 7) -> None:

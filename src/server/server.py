@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 from xml.etree import ElementTree as ET
 
+from ..core import constants
 from .event_examples import get_event_examples
 
 logger = logging.getLogger("tubular.server")
@@ -26,7 +27,7 @@ class ExampleEventsTrigger:
 
     def list_events(self) -> List[str]:
         """List available example events"""
-        return list(get_event_examples().keys())
+        return constants.SUPPORTED_EVENT_TYPES
 
     def get_event_data_template(self, event_type: str) -> Dict[str, Any]:
         """Get a template for the specified event type"""
@@ -204,7 +205,7 @@ class CallbackHandler(BaseHTTPRequestHandler):
                         # Forward as live stream event
                         if self.forwarder:
                             self.forwarder.forward_event(
-                                "youtube.live.update", event_data
+                                constants.EVENT_TYPE_LIVE_UPDATE, event_data
                             )
 
             self.send_response(200)

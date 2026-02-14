@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
+from ..core import constants
+
 logger = logging.getLogger("tubular.api_client")
 
 
@@ -19,7 +21,7 @@ class YouTubeAPIClient:
         self, config: "YouTubeConfig", redis_client: Optional["redis.Redis"] = None
     ):
         self.config = config
-        self.base_url = "https://www.googleapis.com/youtube/v3"
+        self.base_url = constants.YOUTUBE_API_BASE_URL
         self.session = requests.Session()
         self.api_calls = deque(maxlen=100)  # Track last 100 API calls for rate limiting
         self.quota_exceeded = False
@@ -28,10 +30,10 @@ class YouTubeAPIClient:
         # Quota tracking
         self.quota_used_today = 0
         self.quota_reset_date = datetime.now(timezone.utc).date()
-        self.daily_quota_limit = 10000  # YouTube API default daily quota
+        self.daily_quota_limit = constants.YOUTUBE_DAILY_QUOTA_LIMIT
 
         # Quota costs per API operation
-        self.quota_costs = {"search": 100, "videos": 1, "liveChatMessages": 5}
+        self.quota_costs = constants.YOUTUBE_API_QUOTA_COSTS
 
         # Load quota state from Redis if available
         self._load_quota_from_redis()
@@ -42,7 +44,7 @@ class YouTubeAPIClient:
             return
 
         try:
-            quota_data = self.redis_client.get("tubular:quota")
+            quota_data = self.redis_client.get(constants.REDIS_KEY_QUOTA)
             if quota_data:
                 data = json.loads(quota_data)
                 stored_date = datetime.fromisoformat(data["reset_date"]).date()
@@ -76,7 +78,9 @@ class YouTubeAPIClient:
 
             # Store with 48 hour expiry (gives us buffer beyond daily reset)
             self.redis_client.setex(
-                "tubular:quota", 172800, json.dumps(quota_data)  # 48 hours in seconds
+                constants.REDIS_KEY_QUOTA,
+                constants.REDIS_QUOTA_EXPIRY,
+                json.dumps(quota_data),
             )
         except Exception as e:
             logger.error(f"Error saving quota to Redis: {e}")
@@ -84,13 +88,18 @@ class YouTubeAPIClient:
     def _check_rate_limit(self) -> None:
         """Simple rate limiting check"""
         now = datetime.now(timezone.utc)
-        # Remove calls older than 1 minute
-        while self.api_calls and (now - self.api_calls[0]) > timedelta(minutes=1):
+        # Remove calls older than rate limit check period
+        while self.api_calls and (now - self.api_calls[0]) > timedelta(
+            seconds=constants.RATE_LIMIT_CHECK_PERIOD
+        ):
             self.api_calls.popleft()
 
-        # If more than 50 calls in last minute, wait
-        if len(self.api_calls) >= 50:
-            wait_time = 60 - (now - self.api_calls[0]).total_seconds()
+        # If more than max calls in the period, wait
+        if len(self.api_calls) >= constants.RATE_LIMIT_MAX_CALLS_PER_MINUTE:
+            wait_time = (
+                constants.RATE_LIMIT_CHECK_PERIOD
+                - (now - self.api_calls[0]).total_seconds()
+            )
             if wait_time > 0:
                 logger.warning(f"Rate limit approaching, waiting {wait_time:.1f}s")
                 time.sleep(wait_time)

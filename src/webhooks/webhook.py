@@ -11,6 +11,8 @@ from typing import Any, Dict
 
 import requests
 
+from ..core import constants
+
 logger = logging.getLogger("tubular.webhook")
 
 
@@ -34,8 +36,8 @@ class WebhookForwarder:
         }
 
         headers = {
-            "Content-Type": "application/json",
-            "User-Agent": "Tubular-YouTube-Webhook-Forwarder/1.0",
+            "Content-Type": constants.WEBHOOK_CONTENT_TYPE,
+            "User-Agent": constants.WEBHOOK_USER_AGENT,
             "Connection": "close",
         }
 
@@ -50,7 +52,7 @@ class WebhookForwarder:
                 self.config.webhook_url,
                 json=payload,
                 headers=headers,
-                timeout=(3.0, 5.0),
+                timeout=constants.WEBHOOK_REQUEST_TIMEOUT,
             )
             response.raise_for_status()
             logger.info(f"Successfully forwarded {event_type} event")
@@ -61,9 +63,9 @@ class WebhookForwarder:
             self.session = requests.Session()
             logger.error(f"Error forwarding webhook (attempt {retry_count + 1}): {e}")
 
-            # Retry with exponential backoff (max 3 retries)
-            if retry_count < 3:
-                wait_time = 2**retry_count  # 1s, 2s, 4s
+            # Retry with exponential backoff
+            if retry_count < constants.WEBHOOK_RETRY_MAX_ATTEMPTS:
+                wait_time = constants.WEBHOOK_RETRY_BACKOFF**retry_count
                 logger.info(f"Retrying in {wait_time}s...")
                 time.sleep(wait_time)
                 return self.forward_event(event_type, event_data, retry_count + 1)
