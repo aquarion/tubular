@@ -17,6 +17,9 @@ on:
     branches:
       - main
       - feature/*
+  workflow_run:
+    workflows: ["Create Release Tag"]
+    types: [completed]
   workflow_dispatch:
 
 env:
