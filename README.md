@@ -8,13 +8,22 @@ Now organized as a modular Python package:
 
 ```
 tubular/
-├── __init__.py          # Package initialization
-├── __main__.py          # Entry point (python -m tubular)
-├── config.py            # Configuration and environment validation
-├── api_client.py        # YouTube API client with quota tracking
-├── webhook.py           # Webhook forwarding and PubSubHubbub
-├── server.py            # HTTP server for callbacks
-└── monitor.py           # Main monitor class
+├── __init__.py                 # Package initialization
+├── __main__.py                 # Entry point (python -m tubular)
+├── api/                        # YouTube API client
+│   └── api_client.py
+├── chat/                       # Chat message extraction
+│   └── chat_extractors.py
+├── core/                       # Configuration and constants
+│   ├── config.py
+│   └── constants.py
+├── monitoring/                 # Monitoring orchestration
+│   └── monitor.py
+├── server/                     # Callback server and examples
+│   ├── server.py
+│   └── event_examples.py
+└── webhooks/                   # Webhook forwarding and subscriptions
+  └── webhook.py
 ```
 
 ## Features
@@ -46,7 +55,7 @@ pip install -r requirements.txt
 
 ### Docker Compose
 
-Tubular is included in the Stream Delta docker-compose configuration and starts automatically with `sail up`.
+Use the local `docker-compose.yml` in this repo to run Tubular and Redis.
 
 ## Configuration
 
@@ -86,30 +95,38 @@ All configuration is done via environment variables. Copy `.env.example` to `.en
 ### Validate Configuration
 
 ```bash
-python tubular.py --validate
+python -m tubular --validate
 ```
 
 ### Start Monitoring
 
 ```bash
-python tubular.py
+python -m tubular
 ```
 
 ### Docker Compose
 
+**Note:** Ensure `.env` file is configured with required variables (see Configuration section above) before running.
+
 ```bash
 # Start with all services
-sail up -d
+docker compose up -d
 
 # View logs
-sail logs -f tubular
+docker compose logs -f tubular
 
 # Stop tubular only
-sail stop tubular
+docker compose stop tubular
 
 # Rebuild after changes
-sail build tubular
+docker compose build tubular
 ```
+
+**Minimum required env vars for Docker Compose:**
+- `YOUTUBE_API_KEY`
+- `YOUTUBE_CHANNEL_ID`
+- `TUBULAR_CALLBACK_URL`
+- `TUBULAR_WEBHOOK_URL`
 
 ## Endpoints
 
@@ -552,8 +569,15 @@ State is automatically restored on restart, allowing seamless recovery after cra
 
 Run with `--validate` flag to see detailed configuration validation:
 ```bash
-python tubular.py --validate
+python -m tubular --validate
 ```
+
+or with docker:
+
+```bash
+bin/validate-in-docker.sh
+```
+
 
 ### YouTube API Quota Exceeded
 
