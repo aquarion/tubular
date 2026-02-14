@@ -111,11 +111,87 @@ sail stop tubular
 sail build tubular
 ```
 
+## Endpoints
+
+Tubular exposes an HTTP server on `TUBULAR_CALLBACK_PORT` (default: 8080) to handle PubSubHubbub callbacks, testing, and health checks.
+
+### PubSubHubbub Callback
+
+**`GET /youtube/callback`** - PubSubHubbub verification request
+
+Handles subscription/unsubscription verification from the YouTube PubSubHubbub hub. Automatically responds to `hub_challenge` parameters.
+
+**Response:** `200 OK` with hub challenge value
+
+---
+
+**`POST /youtube/callback`** - PubSubHubbub feed notifications
+
+Receives Atom feed updates when YouTube channel videos are published or updated. Automatically parses video details and forwards as webhook events.
+
+**Content-Type:** `application/atom+xml`
+
+**Response:** `200 OK` on success
+
+---
+
+### Health & Testing
+
+**`GET /data/events`** - List available example events
+
+Returns a JSON array of event types available for manual testing.
+
+**Response:**
+```json
+{
+  "available_events": [
+    "youtube.live.started",
+    "youtube.live.ended",
+    "youtube.chat.message",
+    "youtube.chat.superchat",
+    "youtube.chat.new_sponsor"
+  ]
+}
+```
+
+---
+
+**`POST /example/{event_type}`** - Trigger example event
+
+Manually trigger a test event of the specified type. Useful for testing webhook delivery and integration development.
+
+**Example:** `POST /example/youtube.live.started`
+
+**Response:** `200 OK` with confirmation message
+
+**Available event types:**
+- `youtube.live.started`
+- `youtube.live.update`
+- `youtube.live.viewers_updated`
+- `youtube.live.ended`
+- `youtube.chat.message`
+- `youtube.chat.superchat`
+- `youtube.chat.new_sponsor`
+- `youtube.chat.supersticker`
+- `youtube.chat.user_banned`
+- `youtube.chat.message_deleted`
+- `youtube.chat.poll`
+
+---
+
 ## Webhook Events
 
 All webhooks are sent as HTTP POST requests to `TUBULAR_WEBHOOK_URL` with JSON payloads. If `WEBHOOK_SECRET` is configured, requests include an `X-Hub-Signature` header with HMAC-SHA256 signature.
 
+**Webhook Structure:**
+- `event_type` - Type of event (e.g., `youtube.live.started`)
+- `event` - Event-specific data (varies by event type)
+- `timestamp` - When the webhook was sent (ISO 8601)
+- `source` - Always `"youtube"`
+
 ### Live Stream Events
+
+**Note:** Live stream events are custom events created by Tubular by monitoring YouTube's live streaming status. They are derived from the YouTube Data API v3 Videos resource (`liveStreamingDetails` field) and PubSubHubbub feed updates, not from a direct API message type.
 
 #### `youtube.live.started`
 
@@ -125,7 +201,7 @@ Triggered when a live stream begins.
 ```json
 {
   "event_type": "youtube.live.started",
-  "event_data": {
+  "event": {
     "video_id": "dQw4w9WgXcQ",
     "title": "My Live Stream",
     "description": "Stream description",
@@ -134,43 +210,79 @@ Triggered when a live stream begins.
     "started_at": "2026-01-30T12:00:00Z",
     "scheduled_start": "2026-01-30T12:00:00Z",
     "concurrent_viewers": 42
-  }
+  },
+  "timestamp": "2026-01-30T12:00:01Z",
+  "source": "youtube"
 }
 ```
 
 #### `youtube.live.update`
 
-Triggered when stream metadata changes (via PubSubHubbub feed).
+Triggered when a PubSubHubbub feed notification is received from YouTube. Includes raw feed data for detailed inspection.
 
 **Payload:**
 ```json
 {
   "event_type": "youtube.live.update",
-  "event_data": {
+  "event": {
     "video_id": "dQw4w9WgXcQ",
-    "title": "Updated Stream Title",
+    "title": "My Live Stream",
+    "published_at": "2026-01-30T12:00:00Z",
     "channel_id": "UCxxxxxxxxxxxxxx",
-    "published": "2026-01-30T12:00:00Z"
-  }
+    "channel_title": "My Channel",
+    "live_streaming_details": {
+      "actualStartTime": "2026-01-30T12:00:00Z",
+      "scheduledStartTime": "2026-01-30T12:00:00Z",
+      "concurrentViewers": 42
+    },
+    "pubsub_data": {
+      "@attributes": {
+        "xmlns": "http://www.w3.org/2005/Atom",
+        "xmlns:yt": "http://www.youtube.com/xml/schemas/2015"
+      },
+      "title": "#text",
+      "id": "yt:channel:UCxxxxxxxxxxxxxx",
+      "link": {
+        "@attributes": {
+          "href": "http://www.youtube.com/channel/UCxxxxxxxxxxxxxx"
+        }
+      },
+      "entry": {
+        "id": "yt:video:dQw4w9WgXcQ",
+        "yt:videoId": "dQw4w9WgXcQ",
+        "title": "My Live Stream",
+        "published": "2026-01-30T12:00:00Z"
+      }
+    }
+  },
+  "timestamp": "2026-01-30T12:00:01Z",
+  "source": "youtube"
 }
 ```
 
+**Note:** `pubsub_data` contains the Atom feed as a parsed dictionary structure.
+
 #### `youtube.live.viewers_updated`
 
-Triggered when concurrent viewer count changes significantly.
+Triggered when concurrent viewer count changes significantly (>10% or >100 viewers).
 
 **Payload:**
 ```json
 {
   "event_type": "youtube.live.viewers_updated",
-  "event_data": {
+  "event": {
     "video_id": "dQw4w9WgXcQ",
     "concurrent_viewers": 1337,
+    "previous_viewers": 1200,
     "title": "My Live Stream",
     "channel_id": "UCxxxxxxxxxxxxxx"
-  }
+  },
+  "timestamp": "2026-01-30T12:05:00Z",
+  "source": "youtube"
 }
 ```
+
+
 
 #### `youtube.live.ended`
 
@@ -180,16 +292,20 @@ Triggered when a live stream ends.
 ```json
 {
   "event_type": "youtube.live.ended",
-  "event_data": {
+  "event": {
     "video_id": "dQw4w9WgXcQ",
     "title": "My Live Stream",
     "channel_id": "UCxxxxxxxxxxxxxx",
     "ended_at": "2026-01-30T14:00:00Z"
-  }
+  },
+  "timestamp": "2026-01-30T14:00:01Z",
+  "source": "youtube"
 }
 ```
 
 ### Chat Events
+
+All chat event types are verified against the official [YouTube Data API v3 Live Chat Messages documentation](https://developers.google.com/youtube/v3/live/docs/liveChatMessages#resource).
 
 #### `youtube.chat.message`
 
@@ -199,7 +315,7 @@ Triggered for each chat message during a live stream.
 ```json
 {
   "event_type": "youtube.chat.message",
-  "event_data": {
+  "event": {
     "video_id": "dQw4w9WgXcQ",
     "message": "Hello world!",
     "author_name": "Username",
@@ -207,7 +323,9 @@ Triggered for each chat message during a live stream.
     "is_moderator": false,
     "is_sponsor": false,
     "timestamp": "2026-01-30T12:05:00Z"
-  }
+  },
+  "timestamp": "2026-01-30T12:05:01Z",
+  "source": "youtube"
 }
 ```
 
@@ -219,7 +337,7 @@ Triggered when someone sends a Super Chat.
 ```json
 {
   "event_type": "youtube.chat.superchat",
-  "event_data": {
+  "event": {
     "video_id": "dQw4w9WgXcQ",
     "message": "Great stream!",
     "author_name": "GenerousViewer",
@@ -227,12 +345,15 @@ Triggered when someone sends a Super Chat.
     "amount": 5000000,
     "currency": "USD",
     "amount_display": "$5.00",
+    "tier": 4,
     "timestamp": "2026-01-30T12:10:00Z"
-  }
+  },
+  "timestamp": "2026-01-30T12:10:01Z",
+  "source": "youtube"
 }
 ```
 
-**Note:** `amount` is in micros (1,000,000 = $1.00 USD)
+**Note:** `amount` is in micros (1,000,000 = $1.00 USD). `tier` indicates the Super Chat level (1-5, with 5 being the most expensive).
 
 #### `youtube.chat.new_sponsor`
 
@@ -242,18 +363,130 @@ Triggered when someone becomes a channel member.
 ```json
 {
   "event_type": "youtube.chat.new_sponsor",
-  "event_data": {
+  "event": {
     "video_id": "dQw4w9WgXcQ",
     "author_name": "NewMember",
     "author_channel_id": "UCyyyyyyyyyyyyyy",
+    "member_level_name": "Level 1 Member",
+    "is_upgrade": false,
     "timestamp": "2026-01-30T12:15:00Z"
-  }
+  },
+  "timestamp": "2026-01-30T12:15:01Z",
+  "source": "youtube"
+}
+```
+
+**Note:** `member_level_name` is the tier name defined by the channel. `is_upgrade` indicates whether this user upgraded from a lower membership tier.
+
+**Note:** `amount` is in micros (1,000,000 = $1.00 USD)
+
+#### `youtube.chat.supersticker`
+
+Triggered when someone sends a paid animated sticker.
+
+**Payload:**
+```json
+{
+  "event_type": "youtube.chat.supersticker",
+  "event": {
+    "video_id": "dQw4w9WgXcQ",
+    "author_name": "StickerUser",
+    "author_channel_id": "UCyyyyyyyyyyyyyy",
+    "sticker_id": "STICKER_ID_12345",
+    "sticker_alt_text": "A thumbs up gesture",
+    "sticker_language": "en",
+    "amount": 5000000,
+    "currency": "USD",
+    "amount_display": "$5.00",
+    "tier": 4,
+    "timestamp": "2026-01-30T12:20:00Z"
+  },
+  "timestamp": "2026-01-30T12:20:01Z",
+  "source": "youtube"
+}
+```
+
+**Note:** `amount` is in micros (1,000,000 = $1.00 USD). `sticker_id` is a unique ID for the sticker image. Image URLs are not available via the API. `tier` indicates the Super Sticker tier (1-4, with 4 being the most expensive).
+
+#### `youtube.chat.user_banned`
+
+Triggered when a user is banned from chat.
+
+**Payload:**
+```json
+{
+  "event_type": "youtube.chat.user_banned",
+  "event": {
+    "video_id": "dQw4w9WgXcQ",
+    "banned_user_name": "BannedUser",
+    "banned_user_channel_id": "UCyyyyyyyyyyyyyy",
+    "ban_type": "temporary",
+    "ban_duration_seconds": 3600,
+    "timestamp": "2026-01-30T12:25:00Z"
+  },
+  "timestamp": "2026-01-30T12:25:01Z",
+  "source": "youtube"
+}
+```
+
+**Note:** `ban_type` is either `"permanent"` or `"temporary"`. `ban_duration_seconds` is only present for temporary bans.
+
+#### `youtube.chat.message_deleted`
+
+Triggered when a chat message is deleted by a moderator.
+
+**Payload:**
+```json
+{
+  "event_type": "youtube.chat.message_deleted",
+  "event": {
+    "video_id": "dQw4w9WgXcQ",
+    "deleted_message_id": "Ugzxxxxx...",
+    "timestamp": "2026-01-30T12:30:00Z"
+  },
+  "timestamp": "2026-01-30T12:30:01Z",
+  "source": "youtube"
+}
+```
+
+#### `youtube.chat.poll`
+
+Triggered when a poll is created or updated in the live chat.
+
+**Payload:**
+```json
+{
+  "event_type": "youtube.chat.poll",
+  "event": {
+    "video_id": "dQw4w9WgXcQ",
+    "author_name": "PollCreator",
+    "author_channel_id": "UCyyyyyyyyyyyyyy",
+    "question": "What should I play next?",
+    "options": [
+      {
+        "text": "Game A",
+        "tally": "42"
+      },
+      {
+        "text": "Game B",
+        "tally": "38"
+      },
+      {
+        "text": "Game C",
+        "tally": "25"
+      }
+    ],
+    "status": "active",
+    "timestamp": "2026-01-30T12:40:00Z"
+  },
+  "timestamp": "2026-01-30T12:40:01Z",
+  "source": "youtube"
 }
 ```
 
 ## Webhook Signature Verification
 
-If `WEBHOOK_SECRET` is configured, webhooks include an `X-Hub-Signature` header:
+All webhook requests include the full payload (including `timestamp` and `source`) in the request body. If `WEBHOOK_SECRET` is configured, requests include an `X-Hub-Signature` header with HMAC-SHA256 signature calculated over the entire JSON payload.
 
 ```
 X-Hub-Signature: sha256=<hmac_hex_digest>
@@ -263,14 +496,21 @@ X-Hub-Signature: sha256=<hmac_hex_digest>
 ```python
 import hmac
 import hashlib
+import json
 
 def verify_signature(payload_body, signature_header, secret):
     expected = hmac.new(
         secret.encode('utf-8'),
-        payload_body,
+        payload_body if isinstance(payload_body, bytes) else payload_body.encode('utf-8'),
         hashlib.sha256
     ).hexdigest()
     return hmac.compare_digest(f"sha256={expected}", signature_header)
+
+# Usage:
+# payload_body is the raw request body (bytes or string)
+# signature_header is the X-Hub-Signature header value
+# secret is your WEBHOOK_SECRET
+is_valid = verify_signature(request.body, request.headers.get('X-Hub-Signature'), my_secret)
 ```
 
 ## Redis Heartbeat

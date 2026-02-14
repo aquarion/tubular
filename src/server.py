@@ -3,11 +3,12 @@
 import json
 import logging
 import threading
-from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 from xml.etree import ElementTree as ET
+
+from .event_examples import get_event_examples
 
 logger = logging.getLogger("tubular.server")
 
@@ -25,53 +26,11 @@ class ExampleEventsTrigger:
 
     def list_events(self) -> List[str]:
         """List available example events"""
-        return [
-            "youtube.live.start",
-            "youtube.live.end",
-            "youtube.chat.message",
-            "youtube.superchat.received",
-            "youtube.member.joined",
-        ]
+        return list(get_event_examples().keys())
 
     def get_event_data_template(self, event_type: str) -> Dict[str, Any]:
         """Get a template for the specified event type"""
-        templates = {
-            "youtube.live.start": {
-                "video_id": "EXAMPLE_VIDEO_ID",
-                "title": "Example Live Stream",
-                "published_at": datetime.now(timezone.utc).isoformat(),
-                "channel_id": "EXAMPLE_CHANNEL_ID",
-                "channel_title": "Example Channel",
-            },
-            "youtube.live.end": {
-                "video_id": "EXAMPLE_VIDEO_ID",
-                "title": "Example Live Stream",
-                "ended_at": datetime.now(timezone.utc).isoformat(),
-                "channel_id": "EXAMPLE_CHANNEL_ID",
-                "channel_title": "Example Channel",
-            },
-            "youtube.chat.message": {
-                "video_id": "EXAMPLE_VIDEO_ID",
-                "message_id": "EXAMPLE_MESSAGE_ID",
-                "author_name": "Example User",
-                "message_text": "This is an example chat message.",
-                "published_at": datetime.now(timezone.utc).isoformat(),
-            },
-            "youtube.superchat.received": {
-                "video_id": "EXAMPLE_VIDEO_ID",
-                "superchat_id": "EXAMPLE_SUPERCHAT_ID",
-                "author_name": "Example User",
-                "amount_display_string": "$5.00",
-                "message_text": "This is an example super chat message.",
-                "published_at": datetime.now(timezone.utc).isoformat(),
-            },
-            "youtube.member.joined": {
-                "channel_id": "EXAMPLE_CHANNEL_ID",
-                "member_name": "Example Member",
-                "joined_at": datetime.now(timezone.utc).isoformat(),
-            },
-        }
-        return templates.get(event_type, {})
+        return get_event_examples().get(event_type, {})
 
 
 class CallbackHandler(BaseHTTPRequestHandler):
@@ -80,6 +39,38 @@ class CallbackHandler(BaseHTTPRequestHandler):
     forwarder: Optional["WebhookForwarder"] = None
     api_client: Optional["YouTubeAPIClient"] = None
     example_events_trigger: Optional[ExampleEventsTrigger] = None
+
+    @staticmethod
+    def _xml_to_dict(element: ET.Element) -> Any:
+        """Convert ElementTree element to dictionary"""
+        result = {}
+
+        # Add element attributes
+        if element.attrib:
+            result["@attributes"] = element.attrib
+
+        # Add text content if present
+        if element.text and element.text.strip():
+            result["#text"] = element.text.strip()
+
+        # Add child elements
+        for child in element:
+            tag = child.tag
+            # Remove namespace from tag if present
+            if "}" in tag:
+                tag = tag.split("}", 1)[1]
+
+            child_data = CallbackHandler._xml_to_dict(child)
+
+            # Handle multiple children with same tag
+            if tag in result:
+                if not isinstance(result[tag], list):
+                    result[tag] = [result[tag]]
+                result[tag].append(child_data)
+            else:
+                result[tag] = child_data
+
+        return result if result else None
 
     def do_GET(self) -> None:
         """Handle verification requests from PubSubHubbub hub"""
@@ -207,6 +198,7 @@ class CallbackHandler(BaseHTTPRequestHandler):
                             "live_streaming_details": video_details[
                                 "liveStreamingDetails"
                             ],
+                            "pubsub_data": self._xml_to_dict(root),
                         }
 
                         # Forward as live stream event

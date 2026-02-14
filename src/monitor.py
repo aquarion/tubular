@@ -281,6 +281,9 @@ class YouTubeLiveMonitor:
 
     def _check_live_streams(self) -> None:
         """Check for live streams and monitor their status"""
+        # Live stream events are created from YouTube Data API v3 video resources,
+        # specifically the liveStreamingDetails field:
+        # https://developers.google.com/youtube/v3/docs/videos#resource-representation
         now = datetime.now(timezone.utc)
 
         # Smart polling: If we have active streams, rely on PubSubHubbub for updates
@@ -319,6 +322,7 @@ class YouTubeLiveMonitor:
                                 "concurrent_viewers": new_viewers,
                                 "title": details["snippet"]["title"],
                                 "channel_id": details["snippet"]["channelId"],
+                                "api_data": details,
                             }
                             if self.forwarder.forward_event(
                                 "youtube.live.viewers_updated", event_data
@@ -370,6 +374,7 @@ class YouTubeLiveMonitor:
                     "concurrent_viewers": details["liveStreamingDetails"].get(
                         "concurrentViewers", 0
                     ),
+                    "api_data": details,
                 }
 
                 if self.forwarder.forward_event("youtube.live.started", event_data):
@@ -405,6 +410,7 @@ class YouTubeLiveMonitor:
                             "video_id": video_id,
                             "concurrent_viewers": new_viewers,
                             "previous_viewers": old_viewers,
+                            "api_data": details,
                         }
 
                         if self.forwarder.forward_event(
@@ -431,6 +437,7 @@ class YouTubeLiveMonitor:
                 "title": details["snippet"]["title"],
                 "channel_id": details["snippet"]["channelId"],
                 "ended_at": datetime.now(timezone.utc).isoformat(),
+                "api_data": details,
             }
 
             if self.forwarder.forward_event("youtube.live.ended", event_data):
@@ -472,32 +479,150 @@ class YouTubeLiveMonitor:
                     "is_moderator": author.get("isChatModerator", False),
                     "is_sponsor": author.get("isChatSponsor", False),
                     "timestamp": snippet["publishedAt"],
+                    "api_data": {"snippet": snippet, "authorDetails": author},
                 }
                 if self.forwarder.forward_event("youtube.chat.message", event_data):
                     self.stats["events_forwarded"] += 1
 
             elif message_type == "superChatEvent":
+                # Verified against official YouTube Data API v3 documentation
+                # https://developers.google.com/youtube/v3/live/docs/liveChatMessages#resource
+                super_chat_details = snippet.get("superChatDetails", {})
                 event_data = {
                     "video_id": video_id,
-                    "message": snippet["superChatDetails"].get("userComment", ""),
+                    "message": super_chat_details.get("userComment", ""),
                     "author_name": author["displayName"],
                     "author_channel_id": author["channelId"],
-                    "amount": snippet["superChatDetails"]["amountMicros"],
-                    "currency": snippet["superChatDetails"]["currency"],
-                    "amount_display": snippet["superChatDetails"][
-                        "amountDisplayString"
-                    ],
+                    "amount": super_chat_details.get("amountMicros"),
+                    "currency": super_chat_details.get("currency"),
+                    "amount_display": super_chat_details.get("amountDisplayString"),
+                    "tier": super_chat_details.get("tier"),  # Super Chat level (1-5)
                     "timestamp": snippet["publishedAt"],
+                    "api_data": {"snippet": snippet, "authorDetails": author},
                 }
                 if self.forwarder.forward_event("youtube.chat.superchat", event_data):
                     self.stats["events_forwarded"] += 1
 
             elif message_type == "newSponsorEvent":
+                # Verified against official YouTube Data API v3 documentation
+                # https://developers.google.com/youtube/v3/live/docs/liveChatMessages#resource
+                new_sponsor_details = snippet.get("newSponsorDetails", {})
                 event_data = {
                     "video_id": video_id,
                     "author_name": author["displayName"],
                     "author_channel_id": author["channelId"],
+                    "member_level_name": new_sponsor_details.get(
+                        "memberLevelName"
+                    ),  # Membership tier name
+                    "is_upgrade": new_sponsor_details.get(
+                        "isUpgrade", False
+                    ),  # True if upgrading from lower tier
                     "timestamp": snippet["publishedAt"],
+                    "api_data": {"snippet": snippet, "authorDetails": author},
                 }
                 if self.forwarder.forward_event("youtube.chat.new_sponsor", event_data):
+                    self.stats["events_forwarded"] += 1
+
+            elif message_type == "superStickerEvent":
+                # Verified against official YouTube Data API v3 documentation
+                # https://developers.google.com/youtube/v3/live/docs/liveChatMessages#resource
+                sticker_details = snippet.get("superStickerDetails", {})
+                sticker_metadata = sticker_details.get("superStickerMetadata", {})
+                event_data = {
+                    "video_id": video_id,
+                    "author_name": author["displayName"],
+                    "author_channel_id": author["channelId"],
+                    "sticker_id": sticker_metadata.get("stickerId"),
+                    "sticker_alt_text": sticker_metadata.get("altText"),
+                    "sticker_language": sticker_metadata.get("language"),
+                    "amount": sticker_details.get("amountMicros"),
+                    "currency": sticker_details.get("currency"),
+                    "amount_display": sticker_details.get("amountDisplayString"),
+                    "tier": sticker_details.get("tier"),
+                    "timestamp": snippet["publishedAt"],
+                    "api_data": {"snippet": snippet, "authorDetails": author},
+                }
+                if self.forwarder.forward_event(
+                    "youtube.chat.supersticker", event_data
+                ):
+                    self.stats["events_forwarded"] += 1
+
+            elif message_type == "userBannedEvent":
+                # Verified against official YouTube Data API v3 documentation
+                # https://developers.google.com/youtube/v3/live/docs/liveChatMessages#resource
+                banned_details = snippet.get("userBannedDetails", {})
+                banned_user_details = banned_details.get("bannedUserDetails", {})
+                event_data = {
+                    "video_id": video_id,
+                    "banned_user_name": banned_user_details.get("displayName"),
+                    "banned_user_channel_id": banned_user_details.get("channelId"),
+                    "ban_type": banned_details.get(
+                        "banType"
+                    ),  # "permanent" or "temporary"
+                    "ban_duration_seconds": banned_details.get(
+                        "banDurationSeconds"
+                    ),  # Only present for temporary bans
+                    "timestamp": snippet["publishedAt"],
+                    "api_data": {"snippet": snippet, "authorDetails": author},
+                }
+                if self.forwarder.forward_event("youtube.chat.user_banned", event_data):
+                    self.stats["events_forwarded"] += 1
+
+            elif message_type == "messageDeletedEvent":
+                # Verified against official YouTube Data API v3 documentation
+                # https://developers.google.com/youtube/v3/live/docs/liveChatMessages#resource
+                event_data = {
+                    "video_id": video_id,
+                    "deleted_message_id": snippet["messageDeletedDetails"].get(
+                        "deletedMessageId"
+                    ),
+                    "timestamp": snippet["publishedAt"],
+                    "api_data": {"snippet": snippet, "authorDetails": author},
+                }
+                if self.forwarder.forward_event(
+                    "youtube.chat.message_deleted", event_data
+                ):
+                    self.stats["events_forwarded"] += 1
+
+            elif message_type == "pollEvent":
+                # Verified against official YouTube Data API v3 documentation
+                # https://developers.google.com/youtube/v3/live/docs/liveChatMessages#resource
+                poll_details = snippet.get("pollDetails", {})
+                poll_metadata = poll_details.get("metadata", {})
+
+                # Convert options format from API structure
+                options = []
+                api_options = poll_metadata.get("options", [])
+                if isinstance(api_options, list):
+                    for option in api_options:
+                        options.append(
+                            {
+                                "text": option.get("optionText"),
+                                "tally": option.get(
+                                    "tally"
+                                ),  # Vote count (only if authorized)
+                            }
+                        )
+                elif isinstance(api_options, dict):
+                    # Single option case
+                    options.append(
+                        {
+                            "text": api_options.get("optionText"),
+                            "tally": api_options.get("tally"),
+                        }
+                    )
+
+                event_data = {
+                    "video_id": video_id,
+                    "author_name": author["displayName"],
+                    "author_channel_id": author["channelId"],
+                    "question": poll_metadata.get("questionText"),
+                    "options": options,
+                    "status": poll_metadata.get(
+                        "status"
+                    ),  # "unknown", "active", or "closed"
+                    "timestamp": snippet["publishedAt"],
+                    "api_data": {"snippet": snippet, "authorDetails": author},
+                }
+                if self.forwarder.forward_event("youtube.chat.poll", event_data):
                     self.stats["events_forwarded"] += 1
