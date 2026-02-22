@@ -2,36 +2,14 @@
 
 import json
 import logging
-import threading
 from http.server import BaseHTTPRequestHandler
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
 from xml.etree import ElementTree as ET
 
 from ..core import constants
-from .event_examples import get_event_examples
 
 logger = logging.getLogger("tubular.server")
-
-
-class ExampleEventsTrigger:
-    """Example class to trigger specific YouTube events manually"""
-
-    def __init__(self, forwarder: "WebhookForwarder"):
-        self.forwarder = forwarder
-
-    def trigger_event(self, event_type: str, event_data: Dict[str, Any]) -> None:
-        """Trigger a specific event manually"""
-        logger.info(f"Manually triggering event: {event_type}")
-        self.forwarder.forward_event(event_type, event_data)
-
-    def list_events(self) -> List[str]:
-        """List available example events"""
-        return constants.SUPPORTED_EVENT_TYPES
-
-    def get_event_data_template(self, event_type: str) -> Dict[str, Any]:
-        """Get a template for the specified event type"""
-        return get_event_examples().get(event_type, {})
 
 
 class CallbackHandler(BaseHTTPRequestHandler):
@@ -39,7 +17,6 @@ class CallbackHandler(BaseHTTPRequestHandler):
 
     forwarder: Optional["WebhookForwarder"] = None
     api_client: Optional["YouTubeAPIClient"] = None
-    example_events_trigger: Optional[ExampleEventsTrigger] = None
 
     @staticmethod
     def _xml_to_dict(element: ET.Element) -> Any:
@@ -83,12 +60,7 @@ class CallbackHandler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
-                events = (
-                    self.example_events_trigger.list_events()
-                    if self.example_events_trigger
-                    else []
-                )
-                response = {"available_events": events}
+                response = {"available_events": constants.SUPPORTED_EVENT_TYPES}
                 self.wfile.write(json.dumps(response).encode("utf-8"))
                 return
 
@@ -123,41 +95,6 @@ class CallbackHandler(BaseHTTPRequestHandler):
         """Handle feed notifications from PubSubHubbub"""
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length)
-
-        if self.path.startswith("/example/"):
-            event_name = self.path.split("/example/")[1]
-            if self.example_events_trigger:
-                event_data = self.example_events_trigger.get_event_data_template(
-                    event_name
-                )
-                if not event_data:
-                    logger.error(f"Unknown example event: {event_name}")
-                    self.send_response(404)
-                    self.send_header("Content-Type", "text/plain")
-                    self.end_headers()
-                    self.wfile.write(
-                        b"Unknown example event " + event_name.encode("utf-8")
-                    )
-                    return
-                # Fire-and-forget to avoid blocking the HTTP response on retries
-                threading.Thread(
-                    target=self.example_events_trigger.trigger_event,
-                    args=(event_name, event_data),
-                    daemon=True,
-                ).start()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain")
-                self.end_headers()
-                self.wfile.write(
-                    f"Example event {event_name} triggered".encode("utf-8")
-                )
-            else:
-                logger.error("ExampleEventsTrigger not configured")
-                self.send_response(500)
-                self.send_header("Content-Type", "text/plain")
-                self.end_headers()
-                self.wfile.write(b"ExampleEventsTrigger not configured")
-            return
 
         try:
             # Parse Atom feed

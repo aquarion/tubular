@@ -17,7 +17,7 @@ from ..api.api_client import YouTubeAPIClient
 from ..chat.chat_extractors import extract_chat_message
 from ..core import constants
 from ..core.config import YouTubeConfig
-from ..server.server import CallbackHandler, ExampleEventsTrigger
+from ..server.server import CallbackHandler
 from ..webhooks.webhook import PubSubHubbubSubscriber, WebhookForwarder
 
 logger = logging.getLogger("tubular.monitor")
@@ -220,7 +220,6 @@ class YouTubeLiveMonitor:
         """Run the HTTP server for PubSubHubbub callbacks"""
         CallbackHandler.forwarder = self.forwarder
         CallbackHandler.api_client = self.api_client
-        CallbackHandler.example_events_trigger = ExampleEventsTrigger(self.forwarder)
 
         self.server = HTTPServer(
             (self.config.bind_address, self.config.server_port), CallbackHandler
