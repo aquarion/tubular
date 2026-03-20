@@ -31,9 +31,9 @@ tubular/
 - **Live Stream Monitoring**: Detects when streams start and end
 - **Viewer Tracking**: Monitors concurrent viewer count changes
 - **Chat Integration**: Captures chat messages, Super Chats, and new memberships
-- **PubSubHubbub**: Real-time feed notifications from YouTube
+- **PubSubHubbub**: Real-time feed notifications from YouTube with lease tracking
 - **Webhook Forwarding**: Sends structured events to your application
-- **Redis Heartbeat**: Publishes health status for monitoring
+- **Redis Heartbeat**: Publishes health status including quota and subscription state
 - **State Persistence**: Saves stream state to disk for restarts
 - **Retry Logic**: Automatically retries failed webhook deliveries
 
@@ -153,6 +153,41 @@ Receives Atom feed updates when YouTube channel videos are published or updated.
 ---
 
 ### Health & Testing
+
+**`GET /status`** - Monitor health and metrics
+
+Returns current runtime status including uptime, active stream count, quota usage, and PubSubHubbub subscription state.
+
+**Response:**
+```json
+{
+  "timestamp": "2026-01-30T12:30:00Z",
+  "uptime_seconds": 3600,
+  "active_streams": 1,
+  "events_forwarded": 42,
+  "api_calls": 120,
+  "status": "running",
+  "channel_id": "UCxxxxxxxxxxxxxx",
+  "quota": {
+    "used": 1500,
+    "limit": 10000,
+    "remaining": 8500,
+    "usage_percent": 15.0,
+    "reset_date": "2026-01-31",
+    "exceeded": false
+  },
+  "subscription": {
+    "status": "active",
+    "subscribed_at": "2026-01-25T10:00:00Z",
+    "expires_at": "2026-02-04T10:00:00Z",
+    "expires_in_seconds": 864000
+  }
+}
+```
+
+`subscription.status` is `"active"`, `"expired"`, or `"unknown"` (if no subscription has been made in the current process lifetime).
+
+---
 
 **`GET /data/events`** - List available example events
 
@@ -543,7 +578,21 @@ When Redis is configured, Tubular publishes status updates to the `tubular:heart
   "events_forwarded": 42,
   "api_calls": 120,
   "status": "running",
-  "channel_id": "UCxxxxxxxxxxxxxx"
+  "channel_id": "UCxxxxxxxxxxxxxx",
+  "quota": {
+    "used": 1500,
+    "limit": 10000,
+    "remaining": 8500,
+    "usage_percent": 15.0,
+    "reset_date": "2026-01-31",
+    "exceeded": false
+  },
+  "subscription": {
+    "status": "active",
+    "subscribed_at": "2026-01-25T10:00:00Z",
+    "expires_at": "2026-02-04T10:00:00Z",
+    "expires_in_seconds": 864000
+  }
 }
 ```
 
