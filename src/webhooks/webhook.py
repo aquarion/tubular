@@ -111,6 +111,8 @@ class PubSubHubbubSubscriber:
     def __init__(self, config: "YouTubeConfig"):
         self.config = config
         self.session = requests.Session()
+        self.subscribed_at: Optional[datetime] = None
+        self.lease_seconds: int = constants.PUBSUB_SUBSCRIPTION_LEASE_SECONDS
 
     def subscribe(self) -> bool:
         """Subscribe to YouTube channel feed updates"""
@@ -121,18 +123,40 @@ class PubSubHubbubSubscriber:
             "hub.mode": "subscribe",
             "hub.topic": topic_url,
             "hub.verify": "async",
-            "hub.lease_seconds": 864000,  # 10 days
+            "hub.lease_seconds": self.lease_seconds,
         }
 
         try:
             logger.info(f"Subscribing to YouTube channel {self.config.channel_id}")
             response = self.session.post(self.config.hub_url, data=data, timeout=10)
             response.raise_for_status()
+            self.subscribed_at = datetime.now(timezone.utc)
             logger.info("Subscription request sent successfully")
             return True
         except requests.RequestException as e:
             logger.error(f"Error subscribing to feed: {e}")
             return False
+
+    def get_subscription_info(self) -> Dict[str, Any]:
+        """Return current subscription status and lease information"""
+        if self.subscribed_at is None:
+            return {
+                "status": "unknown",
+                "subscribed_at": None,
+                "expires_at": None,
+                "expires_in_seconds": None,
+            }
+
+        expires_at = self.subscribed_at + timedelta(seconds=self.lease_seconds)
+        now = datetime.now(timezone.utc)
+        expires_in = int((expires_at - now).total_seconds())
+
+        return {
+            "status": "active" if expires_in > 0 else "expired",
+            "subscribed_at": self.subscribed_at.isoformat(),
+            "expires_at": expires_at.isoformat(),
+            "expires_in_seconds": max(0, expires_in),
+        }
 
     def unsubscribe(self) -> bool:
         """Unsubscribe from YouTube channel feed updates"""

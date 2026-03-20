@@ -155,6 +155,7 @@ class YouTubeLiveMonitor:
             "status": "running",
             "channel_id": self.config.channel_id,
             "quota": self.api_client.get_quota_info(),
+            "subscription": self.subscriber.get_subscription_info(),
         }
 
     def _update_heartbeat(self) -> None:
@@ -163,6 +164,7 @@ class YouTubeLiveMonitor:
             return
 
         try:
+            now = datetime.now(timezone.utc)
             heartbeat_data = self.get_status()
 
             # Store in Redis with key from constants
