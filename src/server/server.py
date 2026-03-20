@@ -40,6 +40,7 @@ class CallbackHandler(BaseHTTPRequestHandler):
     forwarder: Optional["WebhookForwarder"] = None
     api_client: Optional["YouTubeAPIClient"] = None
     example_events_trigger: Optional[ExampleEventsTrigger] = None
+    monitor: Optional[Any] = None
 
     @staticmethod
     def _xml_to_dict(element: ET.Element) -> Any:
@@ -78,6 +79,17 @@ class CallbackHandler(BaseHTTPRequestHandler):
         try:
             parsed = urlparse(self.path)
             params = parse_qs(parsed.query)
+
+            if self.path == "/status":
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                if self.monitor:
+                    status = self.monitor.get_status()
+                else:
+                    status = {"status": "unavailable"}
+                self.wfile.write(json.dumps(status).encode("utf-8"))
+                return
 
             if self.path == "/data/events":
                 self.send_response(200)

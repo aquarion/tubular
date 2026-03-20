@@ -142,25 +142,28 @@ class YouTubeLiveMonitor:
         if deleted_count > 0:
             logger.info(f"Cleaned up {deleted_count} old log file(s)")
 
+    def get_status(self) -> Dict[str, Any]:
+        """Return current monitor status metrics"""
+        now = datetime.now(timezone.utc)
+        uptime = now - self.stats["start_time"]
+        return {
+            "timestamp": now.isoformat(),
+            "uptime_seconds": int(uptime.total_seconds()),
+            "active_streams": len(self.active_streams),
+            "events_forwarded": self.stats["events_forwarded"],
+            "api_calls": self.stats["api_calls"],
+            "status": "running",
+            "channel_id": self.config.channel_id,
+            "quota": self.api_client.get_quota_info(),
+        }
+
     def _update_heartbeat(self) -> None:
         """Update heartbeat in Redis"""
         if not self.redis_client:
             return
 
         try:
-            now = datetime.now(timezone.utc)
-            uptime = now - self.stats["start_time"]
-
-            heartbeat_data = {
-                "timestamp": now.isoformat(),
-                "uptime_seconds": int(uptime.total_seconds()),
-                "active_streams": len(self.active_streams),
-                "events_forwarded": self.stats["events_forwarded"],
-                "api_calls": self.stats["api_calls"],
-                "status": "running",
-                "channel_id": self.config.channel_id,
-                "quota": self.api_client.get_quota_info(),
-            }
+            heartbeat_data = self.get_status()
 
             # Store in Redis with key from constants
             # Set expiry to 3x heartbeat interval so stale data is cleared
@@ -221,6 +224,7 @@ class YouTubeLiveMonitor:
         CallbackHandler.forwarder = self.forwarder
         CallbackHandler.api_client = self.api_client
         CallbackHandler.example_events_trigger = ExampleEventsTrigger(self.forwarder)
+        CallbackHandler.monitor = self
 
         self.server = HTTPServer(
             (self.config.bind_address, self.config.server_port), CallbackHandler
